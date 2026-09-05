@@ -1,224 +1,240 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ms">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#f5f7fb">
-  <title>YS Barcode Scanner</title>
-  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>YS External Barcode Scanner V2.2</title>
+  <script src="https://unpkg.com/@zxing/library@0.21.3"></script>
   <style>
-    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#172033;background:#f5f7fb}
+    :root{
+      --blue:#173b8f; --light:#eef4ff; --text:#1f2937; --muted:#64748b;
+      --border:#dbe3ef; --danger:#b91c1c; --ok:#166534;
+    }
     *{box-sizing:border-box}
-    body{margin:0;padding:18px;background:#f5f7fb;min-height:100vh}
-    .card{max-width:520px;margin:0 auto;background:#fff;border-radius:18px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
-    h1{font-size:23px;margin:0 0 8px;color:#123a8c}.muted{color:#667085;font-size:15px;line-height:1.5}
-    .video-wrap{position:relative;margin-top:16px;border-radius:14px;overflow:hidden;background:#111;aspect-ratio:3/4;min-height:360px}
+    body{
+      margin:0; font-family:Arial,Helvetica,sans-serif; background:#f5f7fb; color:var(--text);
+    }
+    .wrap{max-width:760px;margin:0 auto;padding:24px 16px 44px}
+    .card{
+      background:white;border-radius:24px;padding:22px;border:1px solid var(--border);
+      box-shadow:0 8px 30px rgba(15,23,42,.08);
+    }
+    h1{margin:0 0 10px;font-size:34px;color:var(--blue)}
+    .lead{font-size:19px;line-height:1.5;color:#52606d;margin-bottom:20px;font-weight:600}
+    .video-wrap{
+      position:relative;border-radius:18px;overflow:hidden;background:#111;aspect-ratio:3/4;
+      max-height:70vh;
+    }
     video{width:100%;height:100%;object-fit:cover;display:block;background:#111}
-    .scan-box{position:absolute;left:7%;right:7%;top:39%;height:22%;border:3px solid rgba(255,255,255,.96);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.18);pointer-events:none}
-    .scan-line{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#2dd4bf;box-shadow:0 0 8px rgba(45,212,191,.9);pointer-events:none}
-    .status{margin-top:14px;padding:13px;border-radius:11px;background:#eef4ff;color:#234;font-size:15px;line-height:1.45}
-    .danger{background:#fff1f2;color:#b42318}.ok{background:#ecfdf3;color:#067647}.warn{background:#fff7ed;color:#9a3412}
-    button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:10px;background:#1f3f94;color:#fff;font-size:16px;font-weight:700}
-    button.secondary{background:#fff;color:#1f3f94;border:1px solid #cfd8ea}
-    .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;word-break:break-all}
-    .manual{display:flex;gap:8px;margin-top:12px}.manual input{flex:1;min-width:0;padding:12px;border:1px solid #d0d5dd;border-radius:10px;font-size:16px}.manual button{width:auto;margin:0;padding:11px 14px}
-    .hint{font-size:13px;color:#667085;margin-top:10px;line-height:1.4}
+    .frame{
+      position:absolute;left:8%;right:8%;top:37%;height:24%;
+      border:4px solid rgba(255,255,255,.9);border-radius:18px;pointer-events:none;
+    }
+    .line{
+      position:absolute;left:11%;right:11%;top:49%;height:3px;background:#2dd4bf;
+      box-shadow:0 0 8px rgba(45,212,191,.8);pointer-events:none;
+    }
+    .status{
+      margin-top:18px;background:var(--light);border-radius:16px;padding:16px 18px;
+      font-size:18px;line-height:1.45;font-weight:700;
+    }
+    .status.err{background:#fef2f2;color:var(--danger)}
+    .status.ok{background:#f0fdf4;color:var(--ok)}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+    button{
+      border:1px solid #cbd5e1;background:#fff;color:var(--blue);font-size:18px;font-weight:700;
+      padding:14px 16px;border-radius:14px;
+    }
+    button.primary{background:var(--blue);color:white;border-color:var(--blue)}
+    .manual{margin-top:18px;display:grid;grid-template-columns:1fr auto;gap:10px}
+    input{
+      width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:12px;font-size:17px;
+    }
+    .diag{
+      margin-top:18px;border-top:1px solid #e5e7eb;padding-top:16px;color:var(--muted);
+      font-size:14px;line-height:1.45;
+    }
+    code{background:#f1f5f9;padding:2px 5px;border-radius:5px}
+    @media(max-width:560px){
+      h1{font-size:28px}
+      .lead{font-size:17px}
+      .actions{grid-template-columns:1fr}
+      .manual{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Scan Barcode Aset</h1>
-    <div class="muted">Halakan kamera pada barcode Code 128. Pastikan barcode memenuhi kotak scan dan kamera fokus.</div>
+  <div class="wrap">
+    <div class="card">
+      <h1>Scan Barcode Aset</h1>
+      <div class="lead">
+        Halakan kamera pada barcode Code 128. Versi ini menggunakan ZXing dalam mod stabil untuk Safari/iPhone.
+      </div>
 
-    <div class="video-wrap">
-      <video id="video" muted playsinline autoplay></video>
-      <div class="scan-box"></div>
-      <div class="scan-line"></div>
+      <div class="video-wrap">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="frame"></div>
+        <div class="line"></div>
+      </div>
+
+      <div id="status" class="status">Memulakan kamera...</div>
+
+      <div class="actions">
+        <button class="primary" id="startBtn">Mula / Fokus Semula</button>
+        <button id="stopBtn">Hentikan Kamera</button>
+      </div>
+
+      <div class="manual">
+        <input id="manualCode" placeholder="Contoh: AST-000001 atau YS-HQ-ICT-1">
+        <button id="manualBtn">Hantar Kod</button>
+      </div>
+
+      <div class="diag" id="diag">
+        Decoder: <code>BrowserMultiFormatReader</code><br>
+        Format dibenarkan: <code>CODE_128</code><br>
+        TRY_HARDER: <code>OFF</code>
+      </div>
     </div>
-
-    <div id="status" class="status">Memulakan kamera...</div>
-    <button id="retry" style="display:none" onclick="startScanner()">Cuba Semula</button>
-    <button class="secondary" onclick="restartScanner()">Fokus / Mula Semula</button>
-
-    <div class="manual">
-      <input id="manualCode" placeholder="Contoh: YS-AYSK-ICT-1" autocomplete="off">
-      <button onclick="submitManual()">Hantar</button>
-    </div>
-    <div class="hint">Tip: pegang telefon 15–30 cm dari barcode, elakkan silau, dan pastikan hanya satu barcode berada dalam kotak scan.</div>
   </div>
-<script>
-  let reader = null;
-  let controls = null;
-  let done = false;
-  let starting = false;
-  const qs = new URLSearchParams(location.search);
-  const returnUrl = qs.get('returnUrl') || '';
 
-  function setStatus(msg, cls){
-    const e=document.getElementById('status');
-    e.className='status'+(cls?' '+cls:'');
-    e.innerHTML=msg;
-  }
+  <script>
+    const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType, NotFoundException } = ZXing;
 
-  function escapeHtml(s){
-    return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  }
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128]);
 
-  async function stopScanner(){
-    try{ if(controls){ controls.stop(); controls=null; } }catch(_){ }
-    try{
-      const video=document.getElementById('video');
-      const stream=video.srcObject;
-      if(stream && stream.getTracks){ stream.getTracks().forEach(t=>t.stop()); }
-      video.srcObject=null;
-    }catch(_){ }
-  }
+    const reader = new BrowserMultiFormatReader(hints, 300);
+    const video = document.getElementById('video');
+    const statusEl = document.getElementById('status');
+    const diagEl = document.getElementById('diag');
 
-  async function startScanner(){
-    if(starting) return;
-    starting=true; done=false;
-    document.getElementById('retry').style.display='none';
-    setStatus('Memulakan kamera...');
-    await stopScanner();
+    let controls = null;
+    let lastSent = '';
+    let lastError = '';
+    let started = false;
 
-    try{
-      if(!window.ZXing) throw new Error('Library ZXing gagal dimuatkan.');
-
-      const hints = new Map();
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_128]);
-      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-      reader = new ZXing.BrowserMultiFormatReader(hints, 80);
-
-      const video = document.getElementById('video');
-      const constraints = {
-        audio:false,
-        video:{
-          facingMode:{ideal:'environment'},
-          width:{ideal:1920},
-          height:{ideal:1080}
-        }
-      };
-
-      controls = await reader.decodeFromConstraints(constraints, video, (result, err) => {
-        if(done) return;
-        if(result){
-          const text = (typeof result.getText === 'function') ? result.getText() : String(result.text || result || '');
-          onScan(text);
-          return;
-        }
-        // NotFoundException is normal while scanning; only show other errors in console.
-        if(err && !(err instanceof ZXing.NotFoundException)) console.debug('ZXing scan:', err);
-      });
-
-      setStatus('Kamera aktif. Halakan barcode Code 128 ke dalam kotak scan.');
-    }catch(e){
-      console.error(e);
-      setStatus('Kamera / scanner tidak dapat dimulakan: '+escapeHtml(e && e.message ? e.message : e),'danger');
-      document.getElementById('retry').style.display='block';
-    }finally{
-      starting=false;
+    function qs(name){
+      return new URLSearchParams(location.search).get(name) || '';
     }
-  }
 
-  async function restartScanner(){
-    setStatus('Memulakan semula kamera...','warn');
-    await startScanner();
-  }
+    function setStatus(text, type=''){
+      statusEl.className = 'status' + (type ? ' ' + type : '');
+      statusEl.textContent = text;
+    }
 
-  async function onScan(text){
-    if(done) return;
-    const code=String(text||'').trim();
-    if(!code) return;
-    done=true;
-    await stopScanner();
-    setStatus('Dikesan: <span class="code">'+escapeHtml(code)+'</span><br>Menghantar ke portal...','ok');
-    sendBack(code);
-  }
+    function normalizeCode(raw){
+      return String(raw || '').trim();
+    }
 
-  function submitManual(){
-    const code=String(document.getElementById('manualCode').value||'').trim();
-    if(!code){ setStatus('Masukkan Kod Inventori dahulu.','warn'); return; }
-    done=true; stopScanner();
-    setStatus('Kod manual: <span class="code">'+escapeHtml(code)+'</span><br>Menghantar ke portal...','ok');
-    sendBack(code);
-  }
+    function validCode(code){
+      return /^(AST-\d{6,}|YS-[A-Z0-9-]+)$/i.test(code);
+    }
 
-  function postScanMessage(target, message){
-    if(!target) return false;
-    let posted=false;
-    try{ target.postMessage(message, '*'); posted=true; }catch(_){ }
+    function sendBack(code){
+      code = normalizeCode(code);
+      if (!code) return;
 
-    // Mobile Safari kadang-kadang menjadikan opener sebagai top-level
-    // script.google.com, sedangkan listener portal berada dalam iframe
-    // googleusercontent. Hantar juga ke child frames opener.
-    try{
-      const len = target.frames ? target.frames.length : 0;
-      for(let i=0;i<len;i++){
-        try{ target.frames[i].postMessage(message, '*'); posted=true; }catch(_){ }
+      if (lastSent === code) return;
+      lastSent = code;
+
+      setStatus('Berjaya dibaca: ' + code, 'ok');
+
+      const returnUrl = qs('return');
+      if (returnUrl) {
+        const url = new URL(returnUrl);
+        url.searchParams.set('scan', code);
+        setTimeout(() => location.href = url.toString(), 450);
+        return;
       }
-    }catch(_){ }
-    return posted;
-  }
 
-  function sendBack(code){
-    const message={type:'YS_BARCODE_SCAN',code:code};
-    let attempted=false;
-    ackReceived=false;
-    ackCode='';
-
-    try{
-      if(window.opener && !window.opener.closed){
-        attempted = postScanMessage(window.opener, message) || attempted;
-      }
-    }catch(_){ }
-
-    if(attempted){
-      setStatus('Barcode dikesan: <span class="code">'+escapeHtml(code)+'</span><br>Menunggu pengesahan portal...','ok');
-
-      // Beri masa portal memproses mesej dan balas ACK. Jangan tutup
-      // scanner terlalu awal kerana Safari boleh gugurkan postMessage.
-      const started=Date.now();
-      const timer=setInterval(()=>{
-        if(ackReceived && (!ackCode || ackCode===code)){
-          clearInterval(timer);
-          setStatus('Berjaya dihantar ke portal. Membuka profil aset...','ok');
-          setTimeout(()=>{ try{window.close();}catch(_){ } },1000);
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type:'YS_BARCODE_SCAN', code }, '*');
+          setTimeout(() => window.close(), 450);
           return;
         }
-        if(Date.now()-started>3500){
-          clearInterval(timer);
-          if(returnUrl){
-            setStatus('Portal tidak memberi pengesahan. Kembali ke portal dengan kod '+escapeHtml(code)+'...','warn');
-            const sep=returnUrl.includes('?')?'&':'?';
-            location.href=returnUrl+sep+'barcode='+encodeURIComponent(code);
-          }else{
-            setStatus('Kod berjaya dibaca tetapi portal tidak dapat dihubungi. Kod: <span class="code">'+escapeHtml(code)+'</span>','warn');
-            done=false;
-            document.getElementById('retry').style.display='block';
+      } catch(e) {}
+
+      navigator.clipboard?.writeText(code).catch(()=>{});
+    }
+
+    async function startScanner(){
+      if (started) {
+        try { controls?.stop(); } catch(e) {}
+        started = false;
+      }
+
+      setStatus('Meminta akses kamera...');
+      lastError = '';
+
+      try {
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        let deviceId = '';
+        if (devices.length) {
+          const preferred = devices.find(d => /back|rear|environment/i.test(d.label));
+          deviceId = (preferred || devices[devices.length - 1]).deviceId;
+        }
+
+        controls = await reader.decodeFromVideoDevice(
+          deviceId || undefined,
+          video,
+          (result, err, ctl) => {
+            if (result) {
+              const code = normalizeCode(result.getText());
+              const format = result.getBarcodeFormat?.();
+              if (code) {
+                if (validCode(code)) {
+                  sendBack(code);
+                  try { ctl.stop(); } catch(e) {}
+                } else {
+                  setStatus('Barcode dibaca tetapi format kod tidak dikenali: ' + code, 'err');
+                }
+              }
+              return;
+            }
+
+            if (err && !(err instanceof NotFoundException)) {
+              const msg = err && err.message ? err.message : String(err);
+              if (msg !== lastError) {
+                lastError = msg;
+                diagEl.innerHTML =
+                  'Decoder: <code>BrowserMultiFormatReader</code><br>' +
+                  'Format: <code>CODE_128</code><br>' +
+                  'Error terakhir: <code>' + msg.replace(/[<>&]/g, '') + '</code>';
+              }
+            }
           }
-        }
-      },150);
-      return;
+        );
+
+        started = true;
+        setStatus('Kamera aktif. Pastikan keseluruhan barcode berada dalam kotak dan telefon stabil.');
+      } catch(e) {
+        const msg = e && e.message ? e.message : String(e);
+        setStatus('Kamera / scanner gagal dimulakan: ' + msg, 'err');
+        diagEl.innerHTML =
+          'Gagal start scanner.<br>Error: <code>' + msg.replace(/[<>&]/g, '') + '</code>';
+      }
     }
 
-    if(returnUrl){
-      const sep=returnUrl.includes('?')?'&':'?';
-      location.href=returnUrl+sep+'barcode='+encodeURIComponent(code);
-      return;
+    function stopScanner(){
+      try { controls?.stop(); } catch(e) {}
+      try { reader.reset(); } catch(e) {}
+      started = false;
+      setStatus('Kamera dihentikan.');
     }
 
-    setStatus('Barcode dikesan, tetapi URL portal tidak ditemui. Kod: <span class="code">'+escapeHtml(code)+'</span>','warn');
-  }
+    document.getElementById('startBtn').addEventListener('click', startScanner);
+    document.getElementById('stopBtn').addEventListener('click', stopScanner);
+    document.getElementById('manualBtn').addEventListener('click', () => {
+      const code = normalizeCode(document.getElementById('manualCode').value);
+      if (!code) return setStatus('Masukkan kod dahulu.', 'err');
+      sendBack(code);
+    });
 
-  window.addEventListener('message', (event)=>{
-    const data=event && event.data;
-    if(!data || data.type!=='YS_BARCODE_ACK') return;
-    ackReceived=true;
-    ackCode=String(data.code||'').trim();
-  });
+    window.addEventListener('pagehide', stopScanner);
+    window.addEventListener('beforeunload', stopScanner);
 
-  window.addEventListener('pagehide', stopScanner);
-  window.addEventListener('load', startScanner);
-</script>
+    startScanner();
+  </script>
 </body>
 </html>
