@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>YS External Barcode Scanner V2.3</title>
+  <title>YS External Barcode Scanner V2.4 Server Callback</title>
   <script src="https://unpkg.com/@zxing/library@0.21.3"></script>
   <style>
     :root{
@@ -68,7 +68,7 @@
     <div class="card">
       <h1>Scan Barcode Aset</h1>
       <div class="lead">
-        Halakan kamera pada barcode Code 128. Versi ini menggunakan ZXing dalam mod stabil untuk Safari/iPhone.
+        Halakan kamera pada barcode Code 128. Versi ini menggunakan ZXing + server callback untuk Safari/iPhone dan Android.
       </div>
 
       <div class="video-wrap">
@@ -130,32 +130,62 @@
       return /^(AST-\d{6,}|YS-[A-Z0-9-]+)$/i.test(code);
     }
 
-    function sendBack(code){
+    async function sendBack(code){
       code = normalizeCode(code);
       if (!code) return;
 
       if (lastSent === code) return;
       lastSent = code;
 
-      setStatus('Berjaya dibaca: ' + code, 'ok');
+      const scanId = qs('scanId');
+      const scanSecret = qs('scanSecret');
+      const callbackUrl = qs('callbackUrl');
 
-      const returnUrl = qs('return');
-      if (returnUrl) {
-        const url = new URL(returnUrl);
-        url.searchParams.set('scan', code);
-        setTimeout(() => location.href = url.toString(), 450);
+      if (!scanId || !scanSecret || !callbackUrl) {
+        setStatus('Barcode berjaya dibaca: ' + code + ' tetapi maklumat sesi portal tiada.', 'err');
+        lastSent = '';
         return;
       }
 
-      try {
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type:'YS_BARCODE_SCAN', code }, '*');
-          setTimeout(() => window.close(), 450);
-          return;
-        }
-      } catch(e) {}
+      setStatus('Berjaya dibaca: ' + code + '. Menghantar ke portal...', 'ok');
 
-      navigator.clipboard?.writeText(code).catch(()=>{});
+      try {
+        const body = new URLSearchParams();
+        body.set('action', 'barcodeScanCallback');
+        body.set('scanId', scanId);
+        body.set('scanSecret', scanSecret);
+        body.set('code', code);
+
+        // no-cors is intentional. We only need the POST to reach Apps Script;
+        // portal polls the authenticated result separately.
+        await fetch(callbackUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: body.toString(),
+          keepalive: true
+        });
+
+        setStatus('Berjaya dihantar ke portal: ' + code + '. Kembali ke portal YS Inventori.', 'ok');
+
+        // Fallback for desktop popup / same-browser environments.
+        try {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type:'YS_BARCODE_SCAN', code }, '*');
+          }
+        } catch(e) {}
+
+        try { controls?.stop(); } catch(e) {}
+
+        setTimeout(() => {
+          try { window.close(); } catch(e) {}
+        }, 1200);
+
+      } catch(e) {
+        const msg = e && e.message ? e.message : String(e);
+        setStatus('Barcode dibaca tetapi gagal dihantar ke portal: ' + msg, 'err');
+        lastSent = '';
+      }
     }
 
     async function startScanner(){
