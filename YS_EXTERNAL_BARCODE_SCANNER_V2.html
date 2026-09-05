@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>YS External Barcode Scanner V2.2</title>
+  <title>YS External Barcode Scanner V2.3</title>
   <script src="https://unpkg.com/@zxing/library@0.21.3"></script>
   <style>
     :root{
@@ -168,7 +168,7 @@
       lastError = '';
 
       try {
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        const devices = await reader.listVideoInputDevices();
         let deviceId = '';
         if (devices.length) {
           const preferred = devices.find(d => /back|rear|environment/i.test(d.label));
