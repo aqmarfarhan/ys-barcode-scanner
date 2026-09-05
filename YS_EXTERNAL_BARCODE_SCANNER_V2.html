@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>YS Barcode Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    :root{font-family:Arial,Helvetica,sans-serif;color:#172033;background:#f5f7fb}
+    body{margin:0;padding:18px;background:#f5f7fb}
+    .card{max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+    h1{font-size:22px;margin:0 0 6px;color:#123a8c}.muted{color:#667085;font-size:14px;line-height:1.45}
+    #reader{margin-top:16px;border-radius:12px;overflow:hidden;background:#eef2f7;min-height:300px}
+    .status{margin-top:14px;padding:12px;border-radius:10px;background:#eef4ff;color:#234}
+    .danger{background:#fff1f2;color:#b42318}.ok{background:#ecfdf3;color:#067647}
+    button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:10px;background:#1f3f94;color:#fff;font-size:16px;font-weight:700}
+    .code{font-family:monospace;font-size:18px;word-break:break-all}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Scan Barcode Aset</h1>
+    <div class="muted">Halakan kamera pada barcode Code 128. Selepas berjaya, kod akan dihantar semula ke portal YS Inventori.</div>
+    <div id="reader"></div>
+    <div id="status" class="status">Memulakan kamera...</div>
+    <button id="retry" style="display:none" onclick="startScanner()">Cuba Semula</button>
+  </div>
+<script>
+  let qr = null, done = false;
+  const qs = new URLSearchParams(location.search);
+  const returnUrl = qs.get('returnUrl') || '';
+  function setStatus(msg, cls){const e=document.getElementById('status');e.className='status'+(cls?' '+cls:'');e.innerHTML=msg;}
+  async function startScanner(){
+    done=false; document.getElementById('retry').style.display='none';
+    try{
+      if(!window.Html5Qrcode) throw new Error('Library scanner gagal dimuatkan.');
+      qr = new Html5Qrcode('reader', {formatsToSupport:[Html5QrcodeSupportedFormats.CODE_128], verbose:false});
+      await qr.start({facingMode:'environment'}, {fps:10, qrbox:{width:300,height:120}, aspectRatio:1.5}, onScan, ()=>{});
+      setStatus('Kamera aktif. Halakan barcode ke dalam kotak scan.');
+    }catch(e){
+      console.error(e); setStatus('Kamera tidak dapat dibuka: '+(e.message||e),'danger'); document.getElementById('retry').style.display='block';
+    }
+  }
+  async function onScan(text){
+    if(done) return; const code=String(text||'').trim(); if(!code) return; done=true;
+    try{ if(qr){await qr.stop(); await qr.clear();} }catch(_){ }
+    setStatus('Dikesan: <span class="code">'+escapeHtml(code)+'</span><br>Menghantar ke portal...','ok');
+    let sent=false;
+    try{
+      if(window.opener && !window.opener.closed){
+        window.opener.postMessage({type:'YS_BARCODE_SCAN',code:code}, '*'); sent=true;
+        setTimeout(()=>{ try{window.close();}catch(_){ } },500);
+      }
+    }catch(_){ }
+    if(!sent && returnUrl){
+      const sep=returnUrl.includes('?')?'&':'?';
+      location.href=returnUrl+sep+'barcode='+encodeURIComponent(code);
+    }
+  }
+  function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+  window.addEventListener('load', startScanner);
+</script>
+</body>
+</html>
