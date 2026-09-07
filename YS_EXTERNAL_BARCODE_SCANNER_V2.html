@@ -1,105 +1,270 @@
 <!DOCTYPE html>
 <html lang="ms">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YS Inventori</title>
-  <meta name="robots" content="noindex,nofollow">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>YS External Barcode Scanner V2.4 Server Callback</title>
+  <script src="https://unpkg.com/@zxing/library@0.21.3"></script>
   <style>
-    html,body{
-      margin:0;
-      width:100%;
-      height:100%;
-      font-family:Arial,Helvetica,sans-serif;
-      background:#0f2f6f;
-      color:#fff;
+    :root{
+      --blue:#173b8f; --light:#eef4ff; --text:#1f2937; --muted:#64748b;
+      --border:#dbe3ef; --danger:#b91c1c; --ok:#166534;
     }
-    .wrap{
-      min-height:100%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:24px;
-      box-sizing:border-box;
-      text-align:center;
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Arial,Helvetica,sans-serif; background:#f5f7fb; color:var(--text);
     }
+    .wrap{max-width:760px;margin:0 auto;padding:24px 16px 44px}
     .card{
-      max-width:520px;
-      width:100%;
-      background:rgba(255,255,255,.08);
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:22px;
-      padding:30px 24px;
-      box-sizing:border-box;
-      backdrop-filter:blur(8px);
+      background:white;border-radius:24px;padding:22px;border:1px solid var(--border);
+      box-shadow:0 8px 30px rgba(15,23,42,.08);
     }
-    h1{margin:0 0 12px;font-size:30px}
-    p{margin:0;color:#e5edf9;line-height:1.5;font-size:16px}
-    .spinner{
-      width:42px;height:42px;
-      border:4px solid rgba(255,255,255,.28);
-      border-top-color:#fff;
-      border-radius:50%;
-      margin:24px auto 0;
-      animation:spin .8s linear infinite;
+    h1{margin:0 0 10px;font-size:34px;color:var(--blue)}
+    .lead{font-size:19px;line-height:1.5;color:#52606d;margin-bottom:20px;font-weight:600}
+    .video-wrap{
+      position:relative;border-radius:18px;overflow:hidden;background:#111;aspect-ratio:3/4;
+      max-height:70vh;
     }
-    .fallback{
-      display:none;
-      margin-top:22px;
+    video{width:100%;height:100%;object-fit:cover;display:block;background:#111}
+    .frame{
+      position:absolute;left:8%;right:8%;top:37%;height:24%;
+      border:4px solid rgba(255,255,255,.9);border-radius:18px;pointer-events:none;
     }
-    .fallback a{
-      display:inline-block;
-      background:#fff;
-      color:#173b8f;
-      text-decoration:none;
-      font-weight:700;
-      padding:12px 18px;
-      border-radius:10px;
+    .line{
+      position:absolute;left:11%;right:11%;top:49%;height:3px;background:#2dd4bf;
+      box-shadow:0 0 8px rgba(45,212,191,.8);pointer-events:none;
     }
-    @keyframes spin{to{transform:rotate(360deg)}}
+    .status{
+      margin-top:18px;background:var(--light);border-radius:16px;padding:16px 18px;
+      font-size:18px;line-height:1.45;font-weight:700;
+    }
+    .status.err{background:#fef2f2;color:var(--danger)}
+    .status.ok{background:#f0fdf4;color:var(--ok)}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+    button{
+      border:1px solid #cbd5e1;background:#fff;color:var(--blue);font-size:18px;font-weight:700;
+      padding:14px 16px;border-radius:14px;
+    }
+    button.primary{background:var(--blue);color:white;border-color:var(--blue)}
+    .manual{margin-top:18px;display:grid;grid-template-columns:1fr auto;gap:10px}
+    input{
+      width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:12px;font-size:17px;
+    }
+    .diag{
+      margin-top:18px;border-top:1px solid #e5e7eb;padding-top:16px;color:var(--muted);
+      font-size:14px;line-height:1.45;
+    }
+    code{background:#f1f5f9;padding:2px 5px;border-radius:5px}
+    @media(max-width:560px){
+      h1{font-size:28px}
+      .lead{font-size:17px}
+      .actions{grid-template-columns:1fr}
+      .manual{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>YS Inventori</h1>
-      <p>Membuka Sistem Pengurusan Aset & Inventori versi terkini...</p>
-      <div class="spinner"></div>
-      <div class="fallback" id="fallback">
-        <p style="margin-bottom:12px;">Jika portal tidak terbuka secara automatik:</p>
-        <a id="openPortal" href="#">Buka Portal YS Inventori</a>
+      <h1>Scan Barcode Aset</h1>
+      <div class="lead">
+        Halakan kamera pada barcode Code 128. Versi ini menggunakan ZXing + server callback untuk Safari/iPhone dan Android.
+      </div>
+
+      <div class="video-wrap">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="frame"></div>
+        <div class="line"></div>
+      </div>
+
+      <div id="status" class="status">Memulakan kamera...</div>
+
+      <div class="actions">
+        <button class="primary" id="startBtn">Mula / Fokus Semula</button>
+        <button id="stopBtn">Hentikan Kamera</button>
+      </div>
+
+      <div class="manual">
+        <input id="manualCode" placeholder="Contoh: AST-000001 atau YS-HQ-ICT-1">
+        <button id="manualBtn">Hantar Kod</button>
+      </div>
+
+      <div class="diag" id="diag">
+        Decoder: <code>BrowserMultiFormatReader</code><br>
+        Format dibenarkan: <code>CODE_128</code><br>
+        TRY_HARDER: <code>OFF</code>
       </div>
     </div>
   </div>
 
   <script>
-    (function () {
-      const PORTAL_URL = 'https://script.google.com/macros/s/AKfycbwt8K_lamQ9s2CVKVNly7r56371SXovLDkleSw6E5g3SZd0wiLSa7u920kBDafd0GKz5w/exec';
+    const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType, NotFoundException } = ZXing;
 
-      // Cache-buster generated automatically on every launch.
-      const u = new URL(PORTAL_URL);
-      u.searchParams.set('cb', Date.now().toString());
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128]);
 
-      // Preserve optional launcher query params if needed in future,
-      // but never overwrite the generated cache-buster.
-      const launcherParams = new URLSearchParams(window.location.search);
-      launcherParams.forEach((value, key) => {
-        if (key !== 'cb') u.searchParams.set(key, value);
-      });
+    const reader = new BrowserMultiFormatReader(hints, 300);
+    const video = document.getElementById('video');
+    const statusEl = document.getElementById('status');
+    const diagEl = document.getElementById('diag');
 
-      const target = u.toString();
-      document.getElementById('openPortal').href = target;
+    let controls = null;
+    let lastSent = '';
+    let lastError = '';
+    let started = false;
 
-      // Use replace so the launcher does not remain in browser back history.
-      setTimeout(() => {
-        window.location.replace(target);
-      }, 250);
+    function qs(name){
+      return new URLSearchParams(location.search).get(name) || '';
+    }
 
-      // Fallback button for restrictive browsers.
-      setTimeout(() => {
-        document.getElementById('fallback').style.display = 'block';
-      }, 2500);
-    })();
+    function setStatus(text, type=''){
+      statusEl.className = 'status' + (type ? ' ' + type : '');
+      statusEl.textContent = text;
+    }
+
+    function normalizeCode(raw){
+      return String(raw || '').trim();
+    }
+
+    function validCode(code){
+      return /^(AST-\d{6,}|YS-[A-Z0-9-]+)$/i.test(code);
+    }
+
+    async function sendBack(code){
+      code = normalizeCode(code);
+      if (!code) return;
+
+      if (lastSent === code) return;
+      lastSent = code;
+
+      const scanId = qs('scanId');
+      const scanSecret = qs('scanSecret');
+      const callbackUrl = qs('callbackUrl');
+
+      if (!scanId || !scanSecret || !callbackUrl) {
+        setStatus('Barcode berjaya dibaca: ' + code + ' tetapi maklumat sesi portal tiada.', 'err');
+        lastSent = '';
+        return;
+      }
+
+      setStatus('Berjaya dibaca: ' + code + '. Menghantar ke portal...', 'ok');
+
+      try {
+        const body = new URLSearchParams();
+        body.set('action', 'barcodeScanCallback');
+        body.set('scanId', scanId);
+        body.set('scanSecret', scanSecret);
+        body.set('code', code);
+
+        // no-cors is intentional. We only need the POST to reach Apps Script;
+        // portal polls the authenticated result separately.
+        await fetch(callbackUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: body.toString(),
+          keepalive: true
+        });
+
+        setStatus('Berjaya dihantar ke portal: ' + code + '. Kembali ke portal YS Inventori.', 'ok');
+
+        // Fallback for desktop popup / same-browser environments.
+        try {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type:'YS_BARCODE_SCAN', code }, '*');
+          }
+        } catch(e) {}
+
+        try { controls?.stop(); } catch(e) {}
+
+        setTimeout(() => {
+          try { window.close(); } catch(e) {}
+        }, 1200);
+
+      } catch(e) {
+        const msg = e && e.message ? e.message : String(e);
+        setStatus('Barcode dibaca tetapi gagal dihantar ke portal: ' + msg, 'err');
+        lastSent = '';
+      }
+    }
+
+    async function startScanner(){
+      if (started) {
+        try { controls?.stop(); } catch(e) {}
+        started = false;
+      }
+
+      setStatus('Meminta akses kamera...');
+      lastError = '';
+
+      try {
+        const devices = await reader.listVideoInputDevices();
+        let deviceId = '';
+        if (devices.length) {
+          const preferred = devices.find(d => /back|rear|environment/i.test(d.label));
+          deviceId = (preferred || devices[devices.length - 1]).deviceId;
+        }
+
+        controls = await reader.decodeFromVideoDevice(
+          deviceId || undefined,
+          video,
+          (result, err, ctl) => {
+            if (result) {
+              const code = normalizeCode(result.getText());
+              const format = result.getBarcodeFormat?.();
+              if (code) {
+                if (validCode(code)) {
+                  sendBack(code);
+                  try { ctl.stop(); } catch(e) {}
+                } else {
+                  setStatus('Barcode dibaca tetapi format kod tidak dikenali: ' + code, 'err');
+                }
+              }
+              return;
+            }
+
+            if (err && !(err instanceof NotFoundException)) {
+              const msg = err && err.message ? err.message : String(err);
+              if (msg !== lastError) {
+                lastError = msg;
+                diagEl.innerHTML =
+                  'Decoder: <code>BrowserMultiFormatReader</code><br>' +
+                  'Format: <code>CODE_128</code><br>' +
+                  'Error terakhir: <code>' + msg.replace(/[<>&]/g, '') + '</code>';
+              }
+            }
+          }
+        );
+
+        started = true;
+        setStatus('Kamera aktif. Pastikan keseluruhan barcode berada dalam kotak dan telefon stabil.');
+      } catch(e) {
+        const msg = e && e.message ? e.message : String(e);
+        setStatus('Kamera / scanner gagal dimulakan: ' + msg, 'err');
+        diagEl.innerHTML =
+          'Gagal start scanner.<br>Error: <code>' + msg.replace(/[<>&]/g, '') + '</code>';
+      }
+    }
+
+    function stopScanner(){
+      try { controls?.stop(); } catch(e) {}
+      try { reader.reset(); } catch(e) {}
+      started = false;
+      setStatus('Kamera dihentikan.');
+    }
+
+    document.getElementById('startBtn').addEventListener('click', startScanner);
+    document.getElementById('stopBtn').addEventListener('click', stopScanner);
+    document.getElementById('manualBtn').addEventListener('click', () => {
+      const code = normalizeCode(document.getElementById('manualCode').value);
+      if (!code) return setStatus('Masukkan kod dahulu.', 'err');
+      sendBack(code);
+    });
+
+    window.addEventListener('pagehide', stopScanner);
+    window.addEventListener('beforeunload', stopScanner);
+
+    startScanner();
   </script>
 </body>
 </html>
