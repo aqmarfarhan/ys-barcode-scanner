@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>YS External Barcode Scanner V2.4 Server Callback</title>
+  <title>YS External Barcode Scanner V2.5 Query Parser Hard Fix</title>
   <script src="https://unpkg.com/@zxing/library@0.21.3"></script>
   <style>
     :root{
@@ -68,7 +68,7 @@
     <div class="card">
       <h1>Scan Barcode Aset</h1>
       <div class="lead">
-        Halakan kamera pada barcode Code 128. Versi ini menggunakan ZXing + server callback untuk Safari/iPhone dan Android.
+        Halakan kamera pada barcode Code 128. Versi ini menggunakan ZXing + server callback dengan query parser stabil untuk Safari/iPhone dan Android.
       </div>
 
       <div class="video-wrap">
@@ -113,8 +113,45 @@
     let lastError = '';
     let started = false;
 
+    function parseQueryFromHref() {
+      const href = String(window.location.href || '');
+      const out = {};
+
+      try {
+        const qIndex = href.indexOf('?');
+        if (qIndex >= 0) {
+          const query = href.slice(qIndex + 1).split('#')[0];
+          query.split('&').forEach(part => {
+            if (!part) return;
+            const eq = part.indexOf('=');
+            const rawKey = eq >= 0 ? part.slice(0, eq) : part;
+            const rawVal = eq >= 0 ? part.slice(eq + 1) : '';
+            const key = decodeURIComponent(rawKey.replace(/\+/g, ' '));
+            const val = decodeURIComponent(rawVal.replace(/\+/g, ' '));
+            out[key] = val;
+          });
+        }
+      } catch (e) {}
+
+      try {
+        const native = new URLSearchParams(window.location.search || '');
+        native.forEach((v, k) => {
+          if (!(k in out) || !out[k]) out[k] = v;
+        });
+      } catch (e) {}
+
+      return out;
+    }
+
+    const QUERY = parseQueryFromHref();
+    const SESSION = {
+      scanId: String(QUERY.scanId || '').trim(),
+      scanSecret: String(QUERY.scanSecret || '').trim(),
+      callbackUrl: String(QUERY.callbackUrl || '').trim()
+    };
+
     function qs(name){
-      return new URLSearchParams(location.search).get(name) || '';
+      return String(QUERY[name] || '').trim();
     }
 
     function setStatus(text, type=''){
@@ -137,9 +174,9 @@
       if (lastSent === code) return;
       lastSent = code;
 
-      const scanId = qs('scanId');
-      const scanSecret = qs('scanSecret');
-      const callbackUrl = qs('callbackUrl');
+      const scanId = SESSION.scanId;
+      const scanSecret = SESSION.scanSecret;
+      const callbackUrl = SESSION.callbackUrl;
 
       if (!scanId || !scanSecret || !callbackUrl) {
         setStatus('Barcode berjaya dibaca: ' + code + ' tetapi maklumat sesi portal tiada.', 'err');
@@ -186,6 +223,24 @@
         setStatus('Barcode dibaca tetapi gagal dihantar ke portal: ' + msg, 'err');
         lastSent = '';
       }
+    }
+
+
+    function updateSessionDiagnostic() {
+      const sid = SESSION.scanId ? (SESSION.scanId.slice(0, 8) + '…') : 'TIADA';
+      const sec = SESSION.scanSecret ? 'ADA' : 'TIADA';
+      let cb = 'TIADA';
+      try {
+        cb = SESSION.callbackUrl ? new URL(SESSION.callbackUrl).hostname : 'TIADA';
+      } catch (e) {}
+
+      diagEl.innerHTML =
+        'Decoder: <code>BrowserMultiFormatReader</code><br>' +
+        'Format dibenarkan: <code>CODE_128</code><br>' +
+        'TRY_HARDER: <code>OFF</code><br>' +
+        'scanId: <code>' + sid + '</code><br>' +
+        'scanSecret: <code>' + sec + '</code><br>' +
+        'callbackUrl: <code>' + cb + '</code>';
     }
 
     async function startScanner(){
@@ -264,6 +319,7 @@
     window.addEventListener('pagehide', stopScanner);
     window.addEventListener('beforeunload', stopScanner);
 
+    updateSessionDiagnostic();
     startScanner();
   </script>
 </body>
